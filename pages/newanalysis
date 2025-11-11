@@ -1,0 +1,213 @@
+import React, { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { useNavigate } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, Loader2, MapPin } from "lucide-react";
+import ImageCapture from "../components/analysis/ImageCapture";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+export default function NewAnalysis() {
+  const navigate = useNavigate();
+  const [capturedFile, setCapturedFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [location, setLocation] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  const handleImageCapture = (file) => {
+    if (file) {
+      setCapturedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setCapturedFile(null);
+      setImagePreview(null);
+    }
+  };
+
+  const simulateAIProcessing = () => {
+    return new Promise((resolve) => {
+      let currentProgress = 0;
+      const interval = setInterval(() => {
+        currentProgress += Math.random() * 15;
+        if (currentProgress >= 100) {
+          currentProgress = 100;
+          clearInterval(interval);
+          setTimeout(() => {
+            resolve({
+              materials_detected: {
+                bitumen: Math.floor(Math.random() * 15 + 80),
+                sand: Math.floor(Math.random() * 20 + 10),
+                gravel: Math.floor(Math.random() * 25 + 60),
+                stone_chips: Math.floor(Math.random() * 20 + 70),
+                dust: Math.floor(Math.random() * 15 + 5)
+              },
+              stone_size_data: {
+                average_size_mm: Math.floor(Math.random() * 10 + 12),
+                size_distribution: [
+                  { range: "5-10mm", count: Math.floor(Math.random() * 50 + 20) },
+                  { range: "10-15mm", count: Math.floor(Math.random() * 100 + 80) },
+                  { range: "15-20mm", count: Math.floor(Math.random() * 80 + 60) },
+                  { range: "20-25mm", count: Math.floor(Math.random() * 40 + 30) },
+                  { range: "25-30mm", count: Math.floor(Math.random() * 20 + 10) }
+                ]
+              },
+              composition_summary: {
+                bitumen_percent: Math.floor(Math.random() * 8 + 5),
+                aggregate_percent: Math.floor(Math.random() * 15 + 75),
+                fines_percent: Math.floor(Math.random() * 10 + 10)
+              }
+            });
+          }, 500);
+        }
+        setProgress(Math.min(currentProgress, 100));
+      }, 300);
+    });
+  };
+
+  const handleAnalyze = async () => {
+    if (!capturedFile) return;
+
+    setIsProcessing(true);
+    setProgress(0);
+
+    try {
+      // Upload image
+      setProgress(20);
+      const { file_url } = await base44.integrations.Core.UploadFile({ file: capturedFile });
+      
+      setProgress(40);
+      // Simulate AI processing
+      const aiResults = await simulateAIProcessing();
+      
+      // Determine quality status and alerts
+      const alerts = [];
+      let qualityStatus = "excellent";
+      
+      if (aiResults.stone_size_data.average_size_mm < 10 || aiResults.stone_size_data.average_size_mm > 25) {
+        alerts.push("Stone size outside recommended range (10-25mm)");
+        qualityStatus = "acceptable";
+      }
+      
+      if (aiResults.composition_summary.bitumen_percent < 4 || aiResults.composition_summary.bitumen_percent > 8) {
+        alerts.push("Bitumen content deviation detected");
+        qualityStatus = qualityStatus === "excellent" ? "good" : "poor";
+      }
+      
+      if (aiResults.materials_detected.dust > 15) {
+        alerts.push("Excessive dust content detected");
+        qualityStatus = "poor";
+      }
+
+      // Create analysis record
+      const analysis = await base44.entities.Analysis.create({
+        image_url: file_url,
+        location: location || "Location not specified",
+        materials_detected: aiResults.materials_detected,
+        stone_size_data: aiResults.stone_size_data,
+        composition_summary: aiResults.composition_summary,
+        quality_status: qualityStatus,
+        alerts: alerts
+      });
+
+      // Navigate to results
+      navigate(createPageUrl(`AnalysisResult?id=${analysis.id}`));
+    } catch (error) {
+      console.error("Error processing analysis:", error);
+      alert("Failed to process image. Please try again.");
+      setIsProcessing(false);
+      setProgress(0);
+    }
+  };
+
+  return (
+    <div className="p-4 md:p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-8">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => navigate(createPageUrl("Dashboard"))}
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800">New Material Analysis</h1>
+            <p className="text-slate-600 mt-1">Capture or upload road material image for AI processing</p>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          {/* Image Capture */}
+          <ImageCapture 
+            onImageCapture={handleImageCapture}
+            capturedImage={imagePreview}
+          />
+
+          {/* Location Input */}
+          {capturedFile && (
+            <Card className="shadow-lg border-slate-200">
+              <CardHeader className="bg-gradient-to-r from-slate-50 to-blue-50 border-b border-slate-200">
+                <CardTitle className="flex items-center gap-2 text-slate-800">
+                  <MapPin className="w-5 h-5 text-blue-600" />
+                  Location Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <Label htmlFor="location" className="text-slate-700">Location / Site Name</Label>
+                <Input
+                  id="location"
+                  placeholder="e.g., Highway 101, Sector 5, Mile Marker 23"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className="mt-2"
+                />
+                <p className="text-sm text-slate-500 mt-2">
+                  Enter the location or site where the sample was taken
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Processing Status */}
+          {isProcessing && (
+            <Alert className="bg-blue-50 border-blue-200">
+              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+              <AlertDescription className="ml-2">
+                <div className="space-y-2">
+                  <p className="font-medium text-blue-800">Processing image with AI...</p>
+                  <div className="w-full bg-blue-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                  <p className="text-sm text-blue-700">{Math.round(progress)}% complete</p>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Analyze Button */}
+          {capturedFile && !isProcessing && (
+            <Button
+              onClick={handleAnalyze}
+              className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 shadow-lg"
+            >
+              <Loader2 className="w-5 h-5 mr-2" />
+              Start AI Analysis
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
