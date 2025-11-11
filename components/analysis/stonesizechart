@@ -1,0 +1,49 @@
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { Ruler } from "lucide-react";
+
+export default function StoneSizeChart({ sizeData }) {
+  return (
+    <Card className="shadow-lg border-slate-200">
+      <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-purple-50 to-pink-50">
+        <CardTitle className="flex items-center gap-2 text-slate-800">
+          <Ruler className="w-5 h-5 text-purple-600" />
+          Stone Size Distribution
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-6">
+        <div className="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
+          <p className="text-sm text-slate-600">Average Stone Size</p>
+          <p className="text-2xl font-bold text-purple-700">
+            {sizeData.average_size_mm} mm
+          </p>
+        </div>
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={sizeData.size_distribution}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <XAxis 
+              dataKey="range" 
+              tick={{ fill: '#64748b', fontSize: 12 }}
+              label={{ value: 'Size Range (mm)', position: 'insideBottom', offset: -5, fill: '#475569' }}
+            />
+            <YAxis 
+              tick={{ fill: '#64748b', fontSize: 12 }}
+              label={{ value: 'Count', angle: -90, position: 'insideLeft', fill: '#475569' }}
+            />
+            <Tooltip 
+              contentStyle={{ 
+                backgroundColor: '#fff', 
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+              }}
+            />
+            <Legend />
+            <Bar dataKey="count" fill="#9333ea" name="Stone Count" radius={[8, 8, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+}
