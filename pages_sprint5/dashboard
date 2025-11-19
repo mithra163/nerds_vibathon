@@ -1,0 +1,218 @@
+import React from "react";
+import { base44 } from "@/api/base44Client";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertTriangle, TrendingUp, Shield, Activity } from "lucide-react";
+import { Link } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { Button } from "@/components/ui/button";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
+} from 'recharts';
+import { format } from 'date-fns';
+
+export default function DashboardPage() {
+  const { data: violations = [] } = useQuery({
+    queryKey: ['violations'],
+    queryFn: () => base44.entities.PPEViolation.list('-timestamp', 100),
+  });
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const todayViolations = violations.filter(v => new Date(v.timestamp) >= today);
+  const unacknowledged = violations.filter(v => !v.acknowledged);
+  const critical = violations.filter(v => v.severity === 'critical');
+  const high = violations.filter(v => v.severity === 'high');
+
+  // Chart data - violations per hour
+  const hourlyData = Array.from({ length: 24 }, (_, i) => {
+    const hour = i;
+    const count = violations.filter(v => {
+      const vDate = new Date(v.timestamp);
+      return vDate.getHours() === hour && vDate >= today;
+    }).length;
+    return { hour: `${hour}:00`, count };
+  }).filter(d => d.count > 0);
+
+  const equipmentStats = {
+    helmet: violations.filter(v => v.missing_equipment?.includes('helmet')).length,
+    gloves: violations.filter(v => v.missing_equipment?.includes('gloves')).length,
+    vest: violations.filter(v => v.missing_equipment?.includes('safety_vest')).length
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Safety Dashboard</h1>
+            <p className="text-gray-500 mt-1">PPE compliance overview and analytics</p>
+          </div>
+          <Link to={createPageUrl("Monitor")}>
+            <Button className="bg-orange-600 hover:bg-orange-700">
+              <Activity className="w-4 h-4 mr-2" />
+              Go to Monitor
+            </Button>
+          </Link>
+        </div>
+
+        {/* Primary Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card className="border-l-4 border-l-red-500">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                Unacknowledged
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-red-600">{unacknowledged.length}</div>
+              <p className="text-xs text-gray-500 mt-1">Require immediate attention</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-orange-500">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                Today's Violations
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-orange-600">{todayViolations.length}</div>
+              <p className="text-xs text-gray-500 mt-1">Detected in last 24 hours</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-red-600">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                <Shield className="w-4 h-4" />
+                Critical Severity
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-red-700">{critical.length}</div>
+              <p className="text-xs text-gray-500 mt-1">Highest priority violations</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-blue-500">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                <Activity className="w-4 h-4" />
+                Total Violations
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-gray-900">{violations.length}</div>
+              <p className="text-xs text-gray-500 mt-1">All time detections</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Equipment Breakdown */}
+        <div className="grid md:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Missing Helmets</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold text-orange-600 mb-2">{equipmentStats.helmet}</div>
+              <p className="text-sm text-gray-600">Helmet violations detected</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Missing Gloves</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold text-blue-600 mb-2">{equipmentStats.gloves}</div>
+              <p className="text-sm text-gray-600">Glove violations detected</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Missing Safety Vests</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold text-yellow-600 mb-2">{equipmentStats.vest}</div>
+              <p className="text-sm text-gray-600">Vest violations detected</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Hourly Chart */}
+        {hourlyData.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Today's Violations by Hour</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={hourlyData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="hour" />
+                  <YAxis />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="count" stroke="#ea580c" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Recent Violations */}
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle>Recent Violations</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {violations.slice(0, 10).map((violation) => (
+                <div key={violation.id} className="flex items-start justify-between p-4 bg-gray-50 rounded-lg">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <AlertTriangle className="w-4 h-4 text-orange-600" />
+                      <span className="font-semibold text-gray-900">
+                        Missing: {violation.missing_equipment?.join(", ")}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600">{violation.location}</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {format(new Date(violation.timestamp), 'MMM d, h:mm a')}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-1 text-xs rounded-full ${
+                      violation.severity === 'critical' ? 'bg-red-100 text-red-800' :
+                      violation.severity === 'high' ? 'bg-orange-100 text-orange-800' :
+                      violation.severity === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-blue-100 text-blue-800'
+                    }`}>
+                      {violation.severity}
+                    </span>
+                    {violation.acknowledged && (
+                      <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
+                        Acknowledged
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
