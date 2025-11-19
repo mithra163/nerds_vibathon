@@ -1,0 +1,36 @@
+import { useEffect, useRef } from 'react';
+
+export default function VoiceAnnouncer({ message, shouldSpeak }) {
+  const hasSpokenRef = useRef(false);
+
+  useEffect(() => {
+    if (shouldSpeak && message && !hasSpokenRef.current) {
+      // Check if speech synthesis is supported
+      if ('speechSynthesis' in window) {
+        // Cancel any ongoing speech
+        window.speechSynthesis.cancel();
+
+        // Create utterance
+        const utterance = new SpeechSynthesisUtterance(message);
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        utterance.volume = 1;
+        utterance.lang = 'en-US';
+
+        // Speak
+        window.speechSynthesis.speak(utterance);
+        
+        hasSpokenRef.current = true;
+        
+        // Reset after speaking
+        utterance.onend = () => {
+          setTimeout(() => {
+            hasSpokenRef.current = false;
+          }, 5000); // Wait 5 seconds before allowing another announcement
+        };
+      }
+    }
+  }, [message, shouldSpeak]);
+
+  return null;
+}
