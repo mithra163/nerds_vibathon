@@ -1,0 +1,55 @@
+{
+  "name": "PPEViolation",
+  "type": "object",
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the violation was detected"
+    },
+    "missing_equipment": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "helmet",
+          "gloves",
+          "safety_vest"
+        ]
+      },
+      "description": "List of missing PPE items"
+    },
+    "location": {
+      "type": "string",
+      "description": "Camera location or zone"
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "default": "medium",
+      "description": "Severity level of violation"
+    },
+    "snapshot_url": {
+      "type": "string",
+      "description": "URL of the captured image"
+    },
+    "acknowledged": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the violation has been acknowledged by supervisor"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional notes about the violation"
+    }
+  },
+  "required": [
+    "timestamp",
+    "missing_equipment"
+  ]
+}
